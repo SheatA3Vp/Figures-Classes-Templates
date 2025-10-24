@@ -1,61 +1,74 @@
 #include "../include/figure_array.hpp"
 
 // Конструкторы
-FigureArray::FigureArray() : FigureArray(0) {}
+template <typename T>
+Array<T>::Array() : Array(0) {}
 
-FigureArray::FigureArray(size_t n) {
+template <typename T>
+Array<T>::Array(size_t n) {
     this->capacity = 10;
-    if (n < 1) {
-        // error 
+    if (n > 0) {
+        while (n > capacity) capacity *= 2;
     }
-    while (n > capacity) capacity *= 2;
-    this->array = new Figure*[capacity];
+    this->array = std::make_shared<T[]>(capacity);
     this->size = 0;
 }
 
 // Конструктор копирования
-FigureArray::FigureArray(const FigureArray& other) : size(other.size), capacity(other.capacity) {
+template <typename T>
+Array<T>::Array(const Array& other) : size(other.size), capacity(other.capacity) {
     if (this->size > 0) {
-        this->array = new Figure*[capacity];
+        this->array = std::make_shared<T[]>(capacity);
         for (size_t i = 0; i < this->size; ++i) {
-            this->array[i] = other.array[i]->clone();
+            if constexpr (std::is_pointer_v<T>) {
+                this->array[i] = static_cast<T>(other.array[i]->clone());
+            } else {
+                this->array[i] = other.array[i];
+            }
         }
-    } else {
-        this->array = nullptr;
     }
 }
 
-// Оператор присваивания копиованием
-FigureArray& FigureArray::operator=(const FigureArray& other) {
+// Оператор присваивания копированием
+template <typename T>
+Array<T>& Array<T>::operator=(const Array& other) {
     if (this->capacity > 0) {
-        for (size_t i = 0; i < this->size; ++i) {
-            delete this->array[i];
+        if constexpr (std::is_pointer_v<T>) {
+            for (size_t i = 0; i < this->size; ++i) {
+                delete this->array[i];
+            }
         }
-        delete[] this->array;
     }
     this->size = other.size;
     this->capacity = other.capacity;
-    this->array = new Figure*[this->capacity];
+    this->array = std::make_shared<T[]>(this->capacity);
     for (size_t i = 0; i < other.size; ++i) {
-        this->array[i] = other.array[i]->clone();
+        if constexpr (std::is_pointer_v<T>) {
+            this->array[i] = static_cast<T>(other.array[i]->clone());
+        } else {
+            this->array[i] = other.array[i];
+        }
     }
     return *this;
 }
 
 // Конструктор перемещения
-FigureArray::FigureArray(FigureArray&& other) noexcept : size(other.size), capacity(other.capacity), array(other.array) {
+template <typename T>
+Array<T>::Array(Array&& other) noexcept : size(other.size), capacity(other.capacity), array(other.array) {
     other.size = 0;
     other.capacity = 0;
     other.array = nullptr;    
 }
 
 // Конструктор присваивания перемещением
-FigureArray& FigureArray::operator=(FigureArray&& other) noexcept {
+template <typename T>
+Array<T>& Array<T>::operator=(Array&& other) noexcept {
     if (this->capacity > 0) {
-        for (size_t i = 0; i < this->size; ++i) {
-            delete this->array[i];
+        if constexpr (std::is_pointer_v<T>) {
+            for (size_t i = 0; i < this->size; ++i) {
+                delete this->array[i];
+            }
         }
-        delete[] this->array;
     }
     this->size = other.size;
     this->capacity = other.capacity;
@@ -67,78 +80,103 @@ FigureArray& FigureArray::operator=(FigureArray&& other) noexcept {
 }
 
 // Деструктор
-FigureArray::~FigureArray() {
+template <typename T>
+Array<T>::~Array() {
     if (this->capacity > 0) {
-        for (size_t i = 0; i < this->size; ++i) {
-            delete this->array[i];
+        if constexpr (std::is_pointer_v<T>) {
+            for (size_t i = 0; i < this->size; ++i) {
+                delete this->array[i];
+            }
         }
-        delete[] this->array;
-    } else {
-        this->array = nullptr;
     }
-    this->size = 0;
-    this->capacity = 0;
 }
 
 // Изменение размера
-void FigureArray::resize(const size_t new_capacity) {
+template <typename T>
+void Array<T>::resize(const size_t new_capacity) {
     if (new_capacity <= this->capacity) return;
     size_t new_cap = this->capacity;
     while (new_cap < new_capacity) new_cap *= 2;
-    Figure** new_array = new Figure*[new_cap];
+    auto new_array = std::make_shared<T[]>(new_cap);
     for (size_t i = 0; i < this->size; ++i) {
-        new_array[i] = this->array[i];
+        if constexpr (std::is_pointer_v<T>) {
+            new_array[i] = this->array[i];
+        } else {
+            new_array[i] = std::move(this->array[i]);
+        }
     }
-    delete[] this->array;
     this->array = new_array;
     this->capacity = new_cap;
 }
 
 // Добавление элемента в массив
-void FigureArray::add(Figure& f) {
+template <typename T>
+void Array<T>::add(T f) {
     if (this->size + 1 > capacity) {
         this->resize(this->size + 1);
     }
-
-    this->array[this->size] = &f;
+    if constexpr (std::is_pointer_v<T>) {
+        this->array[this->size] = f;
+    } else {
+        this->array[this->size] = std::move(f);
+    }
     ++this->size;
 }
 
 // Удаление по индексу
-void FigureArray::pop(size_t index) {
-    delete this->array[index];
+template <typename T>
+void Array<T>::pop(size_t index) {
+    if constexpr (std::is_pointer_v<T>) {
+        delete this->array[index];
+    }
     for (size_t i = index + 1; i < this->size; ++i) {
         this->array[i - 1] = this->array[i];
     }
     --this->size;
-    this->array[this->size] = nullptr;
+    this->array[this->size] = T{};
 }
 
 // Печатаем геометрический центр (центроид) всех фигур
-void FigureArray::array_center() const {
+template <typename T>
+void Array<T>::array_center() const {
     for (size_t i = 0; i < this->size; ++i) {
-        std::cout << this->array[i]->center() <<std::endl;
+        if constexpr (std::is_pointer_v<T>) {
+            std::cout << this->array[i]->center() << std::endl;
+        } else {
+            std::cout << this->array[i].center() << std::endl;
+        }
     }
 }
 
 // Печатаем площадь всех фигур
-void FigureArray::array_square() const {
+template <typename T>
+void Array<T>::array_square() const {
     for (size_t i = 0; i < this->size; ++i) {
-        std::cout << static_cast<double>(*(this->array[i])) <<std::endl;
+        if constexpr (std::is_pointer_v<T>) {
+            std::cout << static_cast<double>(*(this->array[i])) << std::endl;
+        } else {
+            std::cout << static_cast<double>(this->array[i]) << std::endl;
+        }
     }
 }
 
 // Общая площадь всех фигур
-double FigureArray::total_area() const {
+template <typename T>
+double Array<T>::total_area() const {
     double sum = 0.0;
     for (size_t i = 0; i < this->size; ++i) {
-        sum += static_cast<double>(*(this->array[i]));
+        if constexpr (std::is_pointer_v<T>) {
+            sum += static_cast<double>(*(this->array[i]));
+        } else {
+            sum += static_cast<double>(this->array[i]);
+        }
     }
     return sum;
 }
 
 // Чтение/запись
-void FigureArray::read(std::istream& in) {
+template <typename T>
+void Array<T>::read(std::istream& in) {
     std::string type;
     while (in >> type) {
         Figure* f = nullptr;
@@ -162,8 +200,13 @@ void FigureArray::read(std::istream& in) {
     }
 }
 
-void FigureArray::write(std::ostream& out) const {
+template <typename T>
+void Array<T>::write(std::ostream& out) const {
     for (size_t i = 0; i < this->size; ++i) {
-        out << this->array[i]->type() << " " << *(this->array[i]) << std::endl;
+        if constexpr (std::is_pointer_v<T>) {
+            out << this->array[i]->type() << " " << *(this->array[i]) << std::endl;
+        } else {
+            out << this->array[i].type() << " " << this->array[i] << std::endl;
+        }
     }
 }

@@ -1,7 +1,14 @@
 #pragma once
 
 #include <iostream>
+#include <concepts>
 
+template <typename T>
+concept Number = (std::integral<T> || std::floating_point<T>) 
+                 && !std::same_as<T, bool>
+                 && !std::same_as<T, char>;
+
+template <typename T> requires Number<T>
 struct Point {
     double x = 0.0;
     double y = 0.0;
